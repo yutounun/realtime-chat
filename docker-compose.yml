@@ -1,0 +1,18 @@
+services:
+  fastapi-backend:
+    build:
+      context: ./be
+      dockerfile: Dockerfile
+    restart: always
+    volumes:
+      - ./fastapi_backend:/app
+    ports:
+      - "8000:8000"
+
+  react-frontend:
+    build:
+      context: ./fe
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "3002:3002"

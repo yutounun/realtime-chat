@@ -1,54 +1,43 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import "./App.css";
+import useWebSocket, { ReadyState } from "react-use-websocket";
 
 type MessageI = string;
 
 function App() {
-  const ws = useRef<WebSocket | null>(null); // Avoid to be updated every time the component re-renders
-
-  const [connected, setConnected] = useState(false);
-  const [message, setMessage] = useState<MessageI>("");
   const [clientId, setClientId] = useState("");
+  const [message, setMessage] = useState<MessageI>("");
   const [receivedMessages, setReceivedMessages] = useState<MessageI[]>([]);
 
-  // Start WebSocket Connection
-  function startConnection() {
-    ws.current = new WebSocket(`ws://127.0.0.1:8000/ws/${clientId}`);
+  // WebSocket URL based on clientId
+  const socketUrl = clientId ? `ws://127.0.0.1:8000/ws/${clientId}` : null;
 
-    // Connection opened
-    ws.current.onopen = () => {
-      setConnected(true);
+  const { sendMessage, lastMessage, readyState } = useWebSocket(socketUrl, {
+    onOpen: () => {
+      // get history
       console.log("Connection opened");
-    };
-
-    // Receive messages from the server
-    ws.current.onmessage = (event) => {
+    },
+    // Receive message
+    onMessage: (event) => {
       console.log("onmessage", event.data);
-
-      setReceivedMessages((prevMessages: MessageI[]) => [
-        ...prevMessages,
-        event.data,
-      ]);
+      setReceivedMessages((prevMessages) => [...prevMessages, event.data]);
       setMessage(""); // Clear input form
-    };
-
-    // Handle WebSocket errors
-    ws.current.onerror = (error) => {
+    },
+    onError: (error) => {
       console.error("WebSocket error", error);
-    };
-
-    // Handle connection close
-    ws.current.onclose = () => {
+    },
+    onClose: () => {
       console.log("Connection closed");
-      setConnected(false);
-    };
-  }
+    },
+    shouldReconnect: () => true, // Automatically reconnect on disconnection
+  });
 
-  function sendMessage(e: any) {
+  // Send message handler
+  function handleSendMessage(e: any) {
     e.preventDefault();
-    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-      ws.current.send(message); // メッセージをサーバーに送信
-      setMessage(""); // メッセージ送信後に入力をクリア
+    if (readyState === ReadyState.OPEN) {
+      sendMessage(message);
+      setMessage(""); // Clear input form
     } else {
       console.log("WebSocket is not connected.");
     }
@@ -66,18 +55,14 @@ function App() {
         style={{ width: 300 }}
         placeholder="Client ID"
       />
-
-      <button
-        style={{ backgroundColor: "#3596F3", color: "white" }}
-        onClick={startConnection}
-      >
-        Connect
-      </button>
       <h2>
-        Connected: {connected ? "🥰 (ready to send me a love message!!)" : "😭"}
+        Connected:{" "}
+        {readyState === ReadyState.OPEN
+          ? "🥰 (ready to send me a love message!!)"
+          : "😭"}
       </h2>
 
-      <form onSubmit={(e) => sendMessage(e)} style={{ height: 40 }}>
+      <form onSubmit={handleSendMessage} style={{ height: 40 }}>
         <input
           type="text"
           value={message}
@@ -96,6 +81,9 @@ function App() {
           👋
         </button>
       </form>
+
+      <h2>Last message</h2>
+      <p>{lastMessage?.data}</p>
 
       <h2>Received messages</h2>
       <ul>
